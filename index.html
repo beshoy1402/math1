@@ -242,10 +242,12 @@ $('login-submit').onclick=async()=>{let identity=$('login-email').value.trim(),p
 $('google-login').onclick=async()=>{ $('login-error').textContent='';try{const provider=new GoogleAuthProvider();await signInWithPopup(auth,provider)}catch(error){$('login-error').textContent=error.code==='auth/popup-closed-by-user'?'Sign-in window was closed.':error.message}};
 $('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')$('login-submit').click()});
 $('logout').onclick=()=>signOut(auth);
-const TEACHER_UID='QvrkmJMkEAc30zx4Be62OeJabYi1';\nonAuthStateChanged(auth,user=>{
+const TEACHER_UID='QvrkmJMkEAc30zx4Be62OeJabYi1';
+onAuthStateChanged(auth,user=>{
   if(stopStudents){stopStudents();stopStudents=null} if(stopHistory){stopHistory();stopHistory=null}[stopAttendance,stopHomework,stopExams,stopGroups].forEach(x=>x&&x());stopAttendance=stopHomework=stopExams=stopGroups=null;
   if(!user){$('app').classList.add('hidden');$('landing').classList.remove('hidden');$('login-panel').classList.add('hidden');return}
-  if(user.uid!==TEACHER_UID){$('login-error').textContent='This account is not authorized for the teacher workspace.';signOut(auth);return}\n  $('landing').classList.add('hidden');$('app').classList.remove('hidden');
+  if(user.uid!==TEACHER_UID){$('login-error').textContent='This account is not authorized for the teacher workspace.';signOut(auth);return}
+  $('landing').classList.add('hidden');$('app').classList.remove('hidden');
   stopStudents=onSnapshot(collection(db,"students"),snap=>{students=snap.docs.map(d=>({...d.data(),id:Number(d.id)}));render()},err=>notify("Student data error: "+err.message));
   stopHistory=onSnapshot(collection(db,"gradeHistory"),snap=>{history=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>String(b.time).localeCompare(String(a.time)));render()},err=>notify("History data error: "+err.message));stopAttendance=onSnapshot(collection(db,"attendance"),snap=>{attendanceRecords=snap.docs.map(d=>d.data());if(page==="attendance")render()},err=>notify("Attendance error: "+err.message));stopHomework=onSnapshot(collection(db,"homework"),snap=>{homeworkItems=snap.docs.map(d=>d.data());if(page==="homework")render()},err=>notify("Homework error: "+err.message));stopExams=onSnapshot(collection(db,"exams"),snap=>{examItems=snap.docs.map(d=>d.data());if(page==="exams")render()},err=>notify("Exams error: "+err.message));stopGroups=onSnapshot(collection(db,"groups"),snap=>{studentGroups=snap.docs.map(d=>d.data());if(page==="groups")render()},err=>notify("Groups error: "+err.message));
 });
