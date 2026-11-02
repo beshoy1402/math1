@@ -154,7 +154,7 @@ let selectedStudents=new Set();
 let attendanceRecords=[],homeworkItems=[],examItems=[],studentGroups=[];
 let history=[],page='dashboard',activeClass='G12A',selectedId=null,undo=null,search='',toastTimer;
 const $=id=>document.getElementById(id), average=a=>a.length?(a.reduce((n,s)=>n+s.grade,0)/a.length).toFixed(1):'—', members=c=>students.filter(s=>s.cls===c);
-async async function persist(){
+async function persist(){
   if(!auth.currentUser) return;
   try {
     const batch=writeBatch(db);
