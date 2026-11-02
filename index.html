@@ -151,6 +151,54 @@ main{flex:1;min-width:0;padding:30px clamp(18px,4vw,48px);max-width:1500px;margi
 }
 @media(prefers-reduced-motion:reduce){.sidebar,.nav-overlay{transition:none}}
 
+
+/* Final mobile layout overrides */
+@media(max-width:650px){
+  *{-webkit-tap-highlight-color:transparent}
+  html,body{max-width:100%;overflow-x:clip}
+  .app{display:block!important;min-height:100dvh;width:100%;overflow:clip}
+  main{display:block;width:100%;max-width:none;min-width:0;margin:0;padding:14px 12px 100px}
+  .topbar{width:100%;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .topbar-heading{flex:1 1 auto;min-width:0;gap:9px}
+  .topbar-heading>div{min-width:0}
+  .topbar-heading .crumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar-heading h1{font-size:20px;line-height:1.15}
+  .menu-toggle{flex:0 0 44px;width:44px;height:44px;border-radius:13px;font-size:23px;touch-action:manipulation}
+  .top-actions{flex:0 0 auto;display:flex;align-items:center;gap:5px}
+  .top-actions .icon-btn{min-height:40px;padding:8px 9px;border-radius:10px;font-size:11px;white-space:nowrap}
+  .top-actions #logout{font-size:10px;padding:8px}
+  .sidebar{
+    position:fixed!important;top:0!important;bottom:0!important;left:0!important;right:auto!important;
+    z-index:1000!important;width:min(320px,88vw)!important;height:100vh!important;height:100dvh!important;
+    max-height:100dvh;box-sizing:border-box;overflow-y:auto!important;overscroll-behavior:contain;
+    padding:22px 15px calc(22px + env(safe-area-inset-bottom))!important;
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    background:var(--card)!important;transform:translate3d(-105%,0,0)!important;
+    transition:transform .24s ease!important;visibility:hidden;pointer-events:none;
+    box-shadow:18px 0 50px #10182a22;border:0!important;border-right:1px solid var(--line)!important;
+    border-radius:0 18px 18px 0
+  }
+  .sidebar.mobile-open{transform:translate3d(0,0,0)!important;visibility:visible;pointer-events:auto}
+  .sidebar .logo,.sidebar .side-caption,.sidebar .nav-label,.sidebar .account{display:block!important}
+  .sidebar .logo{font-size:21px;padding:5px 10px}
+  .sidebar .side-caption{padding:5px 10px 20px}
+  .sidebar .nav-label{padding:13px 10px 6px}
+  .sidebar nav{display:flex!important;flex:0 0 auto;flex-direction:column!important;gap:2px;overflow:visible!important}
+  .sidebar .nav{display:flex!important;flex:0 0 auto;width:100%;min-height:43px;margin:1px 0;padding:11px 12px;
+    flex-direction:row!important;justify-content:flex-start;align-items:center;gap:12px;
+    font-size:13px;line-height:1.2;text-align:left;white-space:normal}
+  .sidebar .account{margin-top:18px!important;flex:0 0 auto}
+  .nav-overlay{display:block!important;position:fixed!important;inset:0!important;z-index:999!important;
+    background:#10182a80;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease}
+  .nav-overlay.visible{opacity:1;visibility:visible;pointer-events:auto}
+  body.nav-locked{overflow:hidden!important;touch-action:none}
+  .quick-fab{right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:50}
+  .modal-back{z-index:1100}
+  .toast{z-index:1200}
+  .class-grid,.stats{width:100%;min-width:0}
+  .table-wrap{max-width:100%;overflow-x:auto}
+}
+
 </style>
 </head>
 <body>
