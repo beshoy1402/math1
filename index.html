@@ -433,8 +433,7 @@ const sidebar=$('.sidebar'),navOverlay=$('nav-overlay'),menuToggle=$('menu-toggl
 function closeMobileNav(){sidebar.classList.remove('mobile-open');navOverlay.classList.remove('visible');document.body.classList.remove('nav-locked');menuToggle.setAttribute('aria-expanded','false');menuToggle.setAttribute('aria-label','Open navigation')}
 function toggleMobileNav(){const open=!sidebar.classList.contains('mobile-open');sidebar.classList.toggle('mobile-open',open);navOverlay.classList.toggle('visible',open);document.body.classList.toggle('nav-locked',open);menuToggle.setAttribute('aria-expanded',String(open));menuToggle.setAttribute('aria-label',open?'Close navigation':'Open navigation')}
 menuToggle.type='button';
-menuToggle.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggleMobileNav()});
-menuToggle.addEventListener('touchend',e=>{e.preventDefault();toggleMobileNav()},{passive:false});
+menuToggle.onclick=e=>{e.preventDefault();e.stopPropagation();toggleMobileNav()};
 navOverlay.addEventListener('click',closeMobileNav);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileNav()});
 document.querySelectorAll('.sidebar .nav').forEach(b=>b.addEventListener('click',closeMobileNav));
