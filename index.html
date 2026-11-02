@@ -111,6 +111,46 @@ main{flex:1;min-width:0;padding:30px clamp(18px,4vw,48px);max-width:1500px;margi
 .class-wide-toolbar>div:first-child{min-width:140px}.class-wide-toolbar .actions{display:flex;gap:7px;flex-wrap:wrap}.class-wide-toolbar button{min-height:42px}.class-wide-note{width:100%;margin:0}
 @media(max-width:650px){.class-wide-toolbar{display:block;padding:12px}.class-wide-toolbar .actions{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:12px}.class-wide-toolbar .actions button{padding:8px 4px;font-size:11px}.class-wide-note{margin-top:9px}}
 
+
+/* Mobile left-side navigation drawer */
+.menu-toggle{display:none}
+.nav-overlay{display:none}
+@media(max-width:650px){
+  .topbar-heading{display:flex;align-items:center;gap:11px;min-width:0}
+  .menu-toggle{
+    display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    color:var(--text);font-size:22px;line-height:1;box-shadow:var(--shadow)
+  }
+  .sidebar{
+    position:fixed;inset:0 auto 0 0;z-index:32;width:min(310px,86vw);height:100dvh;
+    min-height:0;padding:22px 15px calc(18px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;align-items:stretch;gap:0;overflow-y:auto;overflow-x:hidden;
+    border:0;border-right:1px solid var(--line);border-radius:0 18px 18px 0;
+    box-shadow:18px 0 50px #10182a22;transform:translateX(-110%);
+    transition:transform .25s ease;background:var(--card)
+  }
+  .sidebar.mobile-open{transform:translateX(0)}
+  .sidebar .logo{display:block!important;font-size:21px;padding:5px 10px}
+  .sidebar .side-caption{display:block!important;padding:5px 10px 22px}
+  .sidebar .nav-label{display:block!important;padding:15px 10px 7px}
+  .sidebar .account{display:block!important;margin-top:auto}
+  .sidebar nav{display:flex!important;flex-direction:column;gap:2px;overflow:visible}
+  .sidebar .nav{
+    flex:0 0 auto;min-width:0;width:100%;min-height:43px;margin:1px 0;padding:11px 12px;
+    display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;
+    border-radius:10px;font-size:13px;line-height:1.2;text-align:left;white-space:normal
+  }
+  .nav-overlay{
+    display:block;position:fixed;inset:0;z-index:31;background:#10182a80;
+    opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease
+  }
+  .nav-overlay.visible{opacity:1;visibility:visible}
+  body.nav-locked{overflow:hidden}
+  main{padding-top:14px}
+}
+@media(prefers-reduced-motion:reduce){.sidebar,.nav-overlay{transition:none}}
+
 </style>
 </head>
 <body>
@@ -127,7 +167,8 @@ main{flex:1;min-width:0;padding:30px clamp(18px,4vw,48px);max-width:1500px;margi
 <button class="nav" data-page="calculator">∑ Grade Calculator</button><button class="nav" data-page="admin">⚙ Admin Settings</button><button class="nav" data-page="undo">↶ Undo Center</button>
 </nav><div class="account"><b>Mr. Khaled</b><small>Teacher account · Demo</small></div>
 </aside>
-<main><header class="topbar"><div><div class="crumb">Khaled Math / <span id="crumb">Dashboard</span></div><h1 id="page-title">Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="command-open" title="Command center">⌕</button><button class="icon-btn" id="theme" title="Toggle theme">◐</button><div class="profile-chip">MK &nbsp; Mr. Khaled</div><button class="icon-btn" id="logout">Sign out</button></div></header><div id="content"></div></main>
+<div class="nav-overlay" id="nav-overlay"></div>
+<main><header class="topbar"><div class="topbar-heading"><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button><div><div class="crumb">Khaled Math / <span id="crumb">Dashboard</span></div><h1 id="page-title">Dashboard</h1></div></div><div class="top-actions"><button class="icon-btn" id="command-open" title="Command center">⌕</button><button class="icon-btn" id="theme" title="Toggle theme">◐</button><div class="profile-chip">MK &nbsp; Mr. Khaled</div><button class="icon-btn" id="logout">Sign out</button></div></header><div id="content"></div></main>
 </div>
 <div class="modal-back hidden" id="modal-back"><div class="modal" id="modal"></div></div><button id="quick-fab" class="quick-fab" aria-label="Quick actions">＋</button><div id="toast" class="toast hidden"></div>
 <script type="module">
@@ -259,6 +300,11 @@ onAuthStateChanged(auth,user=>{
   stopHistory=onSnapshot(collection(db,"gradeHistory"),snap=>{history=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>String(b.time).localeCompare(String(a.time)));render()},err=>notify("History data error: "+err.message));stopAttendance=onSnapshot(collection(db,"attendance"),snap=>{attendanceRecords=snap.docs.map(d=>d.data());if(page==="attendance")render()},err=>notify("Attendance error: "+err.message));stopHomework=onSnapshot(collection(db,"homework"),snap=>{homeworkItems=snap.docs.map(d=>d.data());if(page==="homework")render()},err=>notify("Homework error: "+err.message));stopExams=onSnapshot(collection(db,"exams"),snap=>{examItems=snap.docs.map(d=>d.data());if(page==="exams")render()},err=>notify("Exams error: "+err.message));stopGroups=onSnapshot(collection(db,"groups"),snap=>{studentGroups=snap.docs.map(d=>d.data());if(page==="groups")render()},err=>notify("Groups error: "+err.message));
 });
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
+const sidebar=$('.sidebar'),navOverlay=$('nav-overlay'),menuToggle=$('menu-toggle');
+function closeMobileNav(){sidebar.classList.remove('mobile-open');navOverlay.classList.remove('visible');document.body.classList.remove('nav-locked');menuToggle.setAttribute('aria-expanded','false');menuToggle.setAttribute('aria-label','Open navigation')}
+function toggleMobileNav(){const open=!sidebar.classList.contains('mobile-open');sidebar.classList.toggle('mobile-open',open);navOverlay.classList.toggle('visible',open);document.body.classList.toggle('nav-locked',open);menuToggle.setAttribute('aria-expanded',String(open));menuToggle.setAttribute('aria-label',open?'Close navigation':'Open navigation')}
+menuToggle.addEventListener('click',toggleMobileNav);navOverlay.addEventListener('click',closeMobileNav);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileNav()});document.querySelectorAll('.sidebar .nav').forEach(b=>b.addEventListener('click',closeMobileNav));
+
 $('theme').onclick=()=>{document.body.classList.toggle('dark');notify(document.body.classList.contains('dark')?'Dark mode enabled':'Light mode enabled')};
 $('modal-back').addEventListener('click',e=>{if(e.target===$('modal-back'))closeModal()});
 </script>
