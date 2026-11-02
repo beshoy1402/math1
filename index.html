@@ -54,9 +54,8 @@ const db = getFirestore(firebaseApp);
 let stopStudents = null, stopHistory = null, syncing = false;
 
 const classes=[['G12A','AP Calculus','∫'],['G12B','Advanced Math','π'],['G12C','Advanced Math','∑'],['G12D','Advanced Math','√']];
-let students=[['Beshoy Ramy','G12A',76],['Tony Rafik','G12A',82],['Ahmed Mohamed','G12A',91],['Mark Peter','G12A',68],['Mina Ashraf','G12A',88],['Youssef Adel','G12A',73],['Omar Nabil','G12A',95],['Karim Samir','G12A',61],['Adam George','G12B',84],['Peter Mina','G12B',77],['John Michael','G12B',90],['Fady Yasser','G12B',72],['Daniel Hany','G12B',86],['Michael Ramy','G12C',79],['Joseph Nader','G12C',92],['Andrew Mark','G12C',65],['David Mina','G12C',81],['Paul Ashraf','G12D',88],['George Samir','G12D',74],['Nader Fady','G12D',96],['Steven Adel','G12D',69]].map((x,i)=>({id:i+1,name:x[0],cls:x[1],grade:x[2]}));
-try{const saved=JSON.parse(localStorage.getItem('khaledMathStudents')||'null');if(Array.isArray(saved))students=saved;}catch(e){}
-let history=JSON.parse(localStorage.getItem('khaledMathHistory')||'[]'),page='dashboard',activeClass='G12A',selectedId=null,undo=null,search='',toastTimer;
+let students=[];
+let history=[],page='dashboard',activeClass='G12A',selectedId=null,undo=null,search='',toastTimer;
 const $=id=>document.getElementById(id), average=a=>a.length?(a.reduce((n,s)=>n+s.grade,0)/a.length).toFixed(1):'—', members=c=>students.filter(s=>s.cls===c);
 async function persist(){
   if(!auth.currentUser) return;
