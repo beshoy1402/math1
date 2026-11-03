@@ -5,6 +5,31 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.uid == "QvrkmJMkEAc30zx4Be62OeJabYi1";
     }
+    function isValidDailyMark(data) {
+      return data.keys().hasOnly(['id', 'studentId', 'studentName', 'cls', 'date', 'category', 'score'])
+        && data.keys().hasAll(['id', 'studentId', 'studentName', 'cls', 'date', 'category', 'score'])
+        && data.id is string && data.id.size() <= 180
+        && data.studentId is number
+        && data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 200
+        && data.cls in ['G12A', 'G12B', 'G12C', 'G12D']
+        && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2} { allow read, write: if isTeacher(); }
+    match /gradeHistory/{id} { allow read, write: if isTeacher(); }
+    match /attendance/{id} { allow read, write: if isTeacher(); }
+    match /homework/{id} { allow read, write: if isTeacher(); }
+    match /exams/{id} { allow read, write: if isTeacher(); }
+    match /groups/{id} { allow read, write: if isTeacher(); }
+    match /dailyMarks/{id} {
+      allow read, delete: if isTeacher();
+      allow create, update: if isTeacher()
+        && id == request.resource.data.id
+        && isValidDailyMark(request.resource.data);
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+})
+        && data.category in ['Participation', 'Attendance', 'Homework', 'Quiz']
+        && data.score is number;
+    }
     match /students/{id} { allow read, write: if isTeacher(); }
     match /gradeHistory/{id} { allow read, write: if isTeacher(); }
     match /attendance/{id} { allow read, write: if isTeacher(); }
