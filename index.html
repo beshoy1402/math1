@@ -369,11 +369,6 @@ function parseCsvRows(value){
   if(field!==''||row.length){row.push(field);rows.push(row)}
   return rows.filter(cells=>cells.some(cell=>String(cell).trim()!==''));
 }
-function csvCell(value){
-  let text=String(value==null?'':value);
-  if(/^[\t\r ]*[=+\-@]/.test(text))text="'"+text;
-  return '"'+text.replace(/"/g,'""')+'"';
-}
 function greeting(){
   const hour=new Date().getHours();
   return hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
