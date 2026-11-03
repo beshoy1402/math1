@@ -567,12 +567,12 @@ async function exportExcel(){
   const categoryTotals=student=>cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
   const title=(cls==='ALL'?'All Classes':cls)+' · '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
   const rows=[[title],[(reportPeriod==='week'?'Sunday–Thursday: ':'Day: ')+dates[0]+' to '+dates[dates.length-1]+' · '+list.length+' students · Maxima apply per day']];
-  rows.push(['Student','Class','Overall Grade / 100','Bonus Points',...dates.flatMap(date=>[date,'','','','']),'Selected period totals']);
-  rows.push(['','','','',...dates.flatMap(()=>cats.map(category=>category+' / '+categoryMaxima[category])),'Participation total','Attendance total','Homework total','Quizzes total','Behavior total','Daily marks total']);
+  rows.push(['Student','Class','Base Grade / 100','Daily Points (All Days)','Overall Grade / 100','Bonus Points',...dates.flatMap(date=>[date,'','','','']),'Selected period totals']);
+  rows.push(['','','','','','',...dates.flatMap(()=>cats.map(category=>category+' / '+categoryMaxima[category])),'Participation total','Attendance total','Homework total','Quizzes total','Behavior total','Daily marks total']);
   for(const student of list){
     const totals=categoryTotals(student);
     rows.push([
-      student.name,student.cls,Number(student.grade)||0,Number(student.bonus)||0,
+      student.name,student.cls,Number(student.grade)||0,dailyPoints(student),currentGrade(student),Number(student.bonus)||0,
       ...dates.flatMap(date=>cats.map(category=>{
         const entry=mark(student,date,category);
         if(!entry)return '';
@@ -584,13 +584,13 @@ async function exportExcel(){
   }
   let XLSX;try{XLSX=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs')}catch(error){console.error(error);notify('Could not load the Excel exporter. Check the internet connection and try again.');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
-  const totalStart=4+dates.length*cats.length;
+  const totalStart=6+dates.length*cats.length;
   const lastCol=totalStart+cats.length;
   ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:lastCol}},{s:{r:1,c:0},e:{r:1,c:lastCol}}];
-  for(let c=0;c<4;c++)ws['!merges'].push({s:{r:2,c},e:{r:3,c}});
-  dates.forEach((date,index)=>ws['!merges'].push({s:{r:2,c:4+index*cats.length},e:{r:2,c:4+(index+1)*cats.length-1}}));
+  for(let c=0;c<6;c++)ws['!merges'].push({s:{r:2,c},e:{r:3,c}});
+  dates.forEach((date,index)=>ws['!merges'].push({s:{r:2,c:6+index*cats.length},e:{r:2,c:6+(index+1)*cats.length-1}}));
   ws['!merges'].push({s:{r:2,c:totalStart},e:{r:2,c:lastCol}});
-  ws['!cols']=[{wch:26},{wch:12},{wch:18},{wch:14},...Array(dates.length*cats.length).fill({wch:18}),...Array(cats.length+1).fill({wch:19})];
+  ws['!cols']=[{wch:26},{wch:12},{wch:18},{wch:18},{wch:18},{wch:14},...Array(dates.length*cats.length).fill({wch:18}),...Array(cats.length+1).fill({wch:19})];
   XLSX.utils.book_append_sheet(wb,ws,'Marks Report');
   const safe=cls==='ALL'?'All-Classes':cls;
   const filename=safe+'-'+(reportPeriod==='week'?'Week-'+reportWeek:'Day-'+reportDay)+'-Marks.xlsx';
@@ -616,12 +616,12 @@ function exportPdf(){
       return '<td>'+score(student,date,category)+'</td>';
     }).join('')).join('');
     const totals=cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
-    return '<tr><td>'+escapeHtml(student.name)+'</td><td>'+escapeHtml(student.cls)+'</td><td>'+((Number(student.grade)||0)+'/100')+'</td><td>+'+(Number(student.bonus)||0)+'</td>'+dayCells+totals.map(value=>'<td>'+value+'</td>').join('')+'<td>'+totals.reduce((sum,value)=>sum+value,0)+'</td></tr>';
+    return '<tr><td>'+escapeHtml(student.name)+'</td><td>'+escapeHtml(student.cls)+'</td><td>'+((Number(student.grade)||0)+'/100')+'</td><td>'+dailyPoints(student)+'</td><td>'+currentGrade(student)+'/100</td><td>+'+(Number(student.bonus)||0)+'</td>'+dayCells+totals.map(value=>'<td>'+value+'</td>').join('')+'<td>'+totals.reduce((sum,value)=>sum+value,0)+'</td></tr>';
   }).join('');
   const title=(cls==='ALL'?'All Classes':cls)+' '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
   const w=window.open('','_blank');
   if(!w){notify('Allow pop-ups to print or save the report as PDF.');return}
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:12px Arial,sans-serif;padding:24px;color:#182033}h1{margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #cbd2df}th{background:#edf0f8}tr:nth-child(even){background:#fafbfe}.note{color:#5d6678}@page{size:landscape;margin:10mm}@media print{body{padding:0}table{font-size:8px}th,td{padding:4px;break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><h1>Khaled Math — '+escapeHtml(title)+'</h1><p class="note">'+(reportPeriod==='week'?'Sunday–Thursday: '+escapeHtml(dates[0])+' to '+escapeHtml(dates[4]):'Selected day: '+escapeHtml(dates[0]))+' · '+list.length+' students · Category maxima apply per day</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Overall Grade</th><th rowspan="2">Bonus Points</th>'+heads+'<th colspan="6">Selected period totals</th></tr><tr>'+subheads+totalHeads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\\/script></body></html>');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:12px Arial,sans-serif;padding:24px;color:#182033}h1{margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #cbd2df}th{background:#edf0f8}tr:nth-child(even){background:#fafbfe}.note{color:#5d6678}@page{size:landscape;margin:10mm}@media print{body{padding:0}table{font-size:8px}th,td{padding:4px;break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><h1>Khaled Math — '+escapeHtml(title)+'</h1><p class="note">'+(reportPeriod==='week'?'Sunday–Thursday: '+escapeHtml(dates[0])+' to '+escapeHtml(dates[4]):'Selected day: '+escapeHtml(dates[0]))+' · '+list.length+' students · Category maxima apply per day</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Base Grade</th><th rowspan="2">Daily Points (All Days)</th><th rowspan="2">Overall Grade</th><th rowspan="2">Bonus Points</th>'+heads+'<th colspan="6">Selected period totals</th></tr><tr>'+subheads+totalHeads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\\/script></body></html>');
   w.document.close();
 }
 function classWideToolbar(list){return '<div class="class-wide-toolbar"><div><b>Whole class</b><div class="muted small">'+list.length+' students in '+activeClass+'</div></div><div class="actions"><button class="grade-btn down" id="class-minus">−5 everyone</button><button class="grade-btn up" id="class-plus">+5 everyone</button><button class="grade-btn custom" id="class-custom">Custom</button></div><p class="muted small class-wide-note">Applies to every student in this class, not just selected students.</p></div>'}
