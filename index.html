@@ -556,7 +556,7 @@ async function exportExcel(){
   const categoryTotals=student=>cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
   const title=(cls==='ALL'?'All Classes':cls)+' · '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
   const rows=[[title],[(reportPeriod==='week'?'Week of ':'Day: ')+dates[0]+' to '+dates[dates.length-1]+' · '+list.length+' students · Maxima apply per day']];
-  rows.push(['Student','Class','Overall Grade / 100',...dates, 'Selected period totals']);
+  rows.push(['Student','Class','Overall Grade / 100',...dates.flatMap(date=>[date,'','','','']),'Selected period totals']);
   rows.push(['','','',...dates.flatMap(()=>cats.map(category=>category+' / '+categoryMaxima[category])),'Participation total','Attendance total','Homework total','Quizzes total','Behavior total','Daily marks total']);
   for(const student of list){
     const totals=categoryTotals(student);
@@ -571,7 +571,7 @@ async function exportExcel(){
       ...totals,totals.reduce((sum,value)=>sum+value,0)
     ]);
   }
-  const XLSX=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+  let XLSX;try{XLSX=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs')}catch(error){console.error(error);notify('Could not load the Excel exporter. Check the internet connection and try again.');return}
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
   const totalStart=3+dates.length*cats.length;
   const lastCol=totalStart+cats.length;
