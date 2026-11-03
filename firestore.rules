@@ -13,8 +13,12 @@ service cloud.firestore {
         && data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 200
         && data.cls in ['G12A', 'G12B', 'G12C', 'G12D']
         && data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && data.category in ['Participation', 'Attendance', 'Homework', 'Quiz']
-        && data.score is number;
+        && data.category in ['Participation', 'Attendance', 'Homework', 'Behavior']
+        && data.score is number && data.score >= 0
+        && ((data.category == 'Participation' && data.score <= 15)
+          || (data.category == 'Attendance' && data.score <= 10)
+          || (data.category == 'Homework' && data.score <= 10)
+          || (data.category == 'Behavior' && data.score <= 5));
     }
     match /students/{id} { allow read, write: if isTeacher(); }
     match /gradeHistory/{id} { allow read, write: if isTeacher(); }
