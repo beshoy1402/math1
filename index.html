@@ -378,7 +378,7 @@ function greeting(){
   const hour=new Date().getHours();
   return hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
 }
-async function persist(){
+async async function persist(){
   if(!auth.currentUser) return false;
   try {
     const writes=[];
