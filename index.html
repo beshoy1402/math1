@@ -335,6 +335,7 @@ const categoryMaxima={Participation:15,Attendance:10,Homework:10,Quizzes:15,Beha
 let selectedStudents=new Set();
 let attendanceRecords=[],homeworkItems=[],examItems=[],studentGroups=[],dailyMarks=[];
 let history=[],page='dashboard',activeClass='G12A',selectedId=null,undo=null,search='',toastTimer,markCategory='Participation',markDate=new Date().toISOString().slice(0,10),markStudentId=null;
+let reportPeriod='day',reportDay=localDateString(),reportWeek=isoWeekValue(),reportClass='G12A';
 const $=id=>document.getElementById(id), average=a=>a.length?(a.reduce((n,s)=>n+s.grade,0)/a.length).toFixed(1):'—', members=c=>students.filter(s=>s.cls===c);
 function nextStudentId(){
   const used=new Set([
@@ -507,12 +508,112 @@ async function applyDailyMark(amount){
   const record={id,studentId:student.id,studentName:student.name,cls:student.cls,date,category,score:next};
   await writeDailyMark(record,student.name+' · '+category+': '+previous+' → '+next+' / '+categoryMaxima[category],'Could not save daily mark: ');
 }
-function exportToolbar(){return '<div class="export-toolbar"><button class="icon-btn" id="export-excel">↓ Excel (CSV)</button><button class="icon-btn" id="export-pdf">↓ PDF / Print</button></div>'}
+
+function localDateString(date=new Date()){
+  return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+}
+function isoWeekValue(date=new Date()){
+  const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+  d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
+  const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const week=Math.ceil((((d-yearStart)/86400000)+1)/7);
+  return d.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+}
+function reportDates(){
+  if(reportPeriod==='week'){
+    const match=/^(\\d{4})-W(\\d{2})$/.exec(reportWeek);
+    if(!match)throw new Error('Choose a valid week.');
+    const year=Number(match[1]),week=Number(match[2]),jan4=new Date(Date.UTC(year,0,4));
+    const monday=new Date(jan4);monday.setUTCDate(jan4.getUTCDate()-(jan4.getUTCDay()||7)+1+(week-1)*7);
+    return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setUTCDate(monday.getUTCDate()+i);return d.toISOString().slice(0,10)});
+  }
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(reportDay))throw new Error('Choose a valid day.');
+  return [reportDay];
+}
+function selectedReport(){
+  const cls=$('report-class')?$('report-class').value:reportClass;
+  const dates=reportDates();
+  const list=(cls==='ALL'?students:students.filter(s=>s.cls===cls)).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return {cls,dates,list};
+}
+function exportToolbar(){
+  const classesOptions='<option value="ALL" '+(reportClass==='ALL'?'selected':'')+'>All classes</option>'+classes.map(c=>'<option value="'+c[0]+'" '+(reportClass===c[0]?'selected':'')+'>'+c[0]+' · '+c[1]+'</option>').join('');
+  return '<div class="export-toolbar report-toolbar"><label>Class<select class="field" id="report-class" style="width:auto;min-width:150px;margin:0">'+classesOptions+'</select></label><label>Report<select class="field" id="report-period" style="width:auto;margin:0"><option value="day" '+(reportPeriod==='day'?'selected':'')+'>One day</option><option value="week" '+(reportPeriod==='week'?'selected':'')+'>Whole week</option></select></label><label id="report-day-wrap" '+(reportPeriod==='week'?'class="hidden"':'')+'>Day<input class="field" type="date" id="report-day" value="'+escapeHtml(reportDay)+'" style="width:auto;margin:0"></label><label id="report-week-wrap" '+(reportPeriod==='day'?'class="hidden"':'')+'>Week<input class="field" type="week" id="report-week" value="'+escapeHtml(reportWeek)+'" style="width:auto;margin:0"></label><button class="icon-btn" id="export-excel">↓ Excel (.xlsx)</button><button class="icon-btn" id="export-pdf">↓ PDF / Print</button></div>';
+}
+
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
 function csvCell(value){let text=String(value==null?'':value);if(/^[\t\r ]*[=+\-@]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"'}
-function exportExcel(){const list=page==='class'?members(activeClass):students;if(!list.length){notify('There are no students to export');return}const cats=['Participation','Attendance','Homework','Quizzes','Behavior'],days=[...new Set(dailyMarks.filter(m=>list.some(s=>String(s.id)===String(m.studentId))).map(m=>m.date))].sort(),val=(s,d,k)=>Number((dailyMarks.find(m=>String(m.studentId)===String(s.id)&&m.date===d&&m.category===k)||{}).score)||0,cell=(s,d,k)=>{const m=dailyMarks.find(x=>String(x.studentId)===String(s.id)&&x.date===d&&x.category===k);return k==='Attendance'?(m?(m.status||((m.score||0)===10?'Present':'Absent'))+' ('+m.score+')':''):val(s,d,k)};const cols=['Student','Class','Grade / 100',...days.flatMap(d=>cats.map(k=>k+' '+d+(k==='Attendance'?' (max 10; Present/Absent)':' (max '+categoryMaxima[k]+')'))),...cats.map(k=>k+' total across days'),'Daily marks total'];const rows=list.map(s=>{const totals=cats.map(k=>days.reduce((n,d)=>n+val(s,d,k),0));return [s.name,s.cls,s.grade,100,...days.flatMap(d=>cats.map(k=>cell(s,d,k))),...totals,totals.reduce((x,y)=>x+y,0)]});const csv=[cols,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n');const blob=new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=(page==='class'?activeClass:'All-Classes')+'-Full-Class-Report.csv';link.click();URL.revokeObjectURL(url);notify('Full-class daily marks report exported')}
-function exportPdf(){const list=page==='class'?members(activeClass):students;if(!list.length){notify('There are no students to export');return}const cats=['Participation','Attendance','Homework','Quizzes','Behavior'],days=[...new Set(dailyMarks.filter(m=>list.some(s=>String(s.id)===String(m.studentId))).map(m=>m.date))].sort(),val=(s,d,k)=>Number((dailyMarks.find(m=>String(m.studentId)===String(s.id)&&m.date===d&&m.category===k)||{}).score)||0;const cell=(s,d,k)=>{const m=dailyMarks.find(x=>String(x.studentId)===String(s.id)&&x.date===d&&x.category===k);return k==='Attendance'?(m?escapeHtml((m.status||((m.score||0)===10?'Present':'Absent'))+' ('+m.score+')'):''):val(s,d,k)};const heads=days.map(d=>'<th colspan="5">'+escapeHtml(d)+'</th>').join(''),sub=days.map(()=>cats.map(k=>'<th>'+k+' / '+categoryMaxima[k]+(k==='Attendance'?' · Present/Absent':'')+'</th>').join('')).join(''),totalheads=cats.map(k=>'<th>'+k+' total</th>').join(''),rows=list.map(s=>{const totals=cats.map(k=>days.reduce((n,d)=>n+val(s,d,k),0));return '<tr><td>'+escapeHtml(s.name)+'</td><td>'+escapeHtml(s.cls)+'</td><td>'+s.grade+'/100</td>'+days.map(d=>cats.map(k=>'<td>'+cell(s,d,k)+'</td>').join('')).join('')+totals.map(x=>'<td>'+x+'</td>').join('')+'</tr>'}).join('');const w=window.open('','_blank');if(!w){notify('Allow pop-ups to print the PDF');return}w.document.write('<!doctype html><html><head><title>Class marks report</title><style>body{font:12px Arial;padding:24px;color:#182033}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #ddd}th{background:#f2f4f8}@media print{body{padding:8mm}table{font-size:9px}}</style></head><body><h1>Khaled Math — '+escapeHtml(page==='class'?activeClass:'All Classes')+' Report</h1><p>Generated '+new Date().toLocaleString()+' · Students: '+list.length+'</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Grade</th>'+heads+'<th colspan="5">Totals</th></tr><tr>'+sub+totalheads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>');w.document.close()}
+
+async function exportExcel(){
+  let report;
+  try{report=selectedReport()}catch(error){notify(error.message);return}
+  const {cls,dates,list}=report;
+  if(!list.length){notify('No students found for this class.');return}
+  const cats=['Participation','Attendance','Homework','Quizzes','Behavior'];
+  const mark=(student,date,category)=>dailyMarks.find(m=>String(m.studentId)===String(student.id)&&m.date===date&&m.category===category);
+  const score=(student,date,category)=>Number((mark(student,date,category)||{}).score)||0;
+  const categoryTotals=student=>cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
+  const title=(cls==='ALL'?'All Classes':cls)+' · '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
+  const rows=[[title],[(reportPeriod==='week'?'Week of ':'Day: ')+dates[0]+' to '+dates[dates.length-1]+' · '+list.length+' students · Maxima apply per day']];
+  rows.push(['Student','Class','Overall Grade / 100',...dates.map(()=>''), '']);
+  rows.push(['','','',...dates.flatMap(()=>cats.map(category=>category+' / '+categoryMaxima[category])),'Participation total','Attendance total','Homework total','Quizzes total','Behavior total','Daily marks total']);
+  for(const student of list){
+    const totals=categoryTotals(student);
+    rows.push([
+      student.name,student.cls,Number(student.grade)||0,
+      ...dates.flatMap(date=>cats.map(category=>{
+        const entry=mark(student,date,category);
+        if(!entry)return '';
+        if(category==='Attendance')return (entry.status||((entry.score||0)===10?'Present':'Absent'))+' ('+(Number(entry.score)||0)+')';
+        return Number(entry.score)||0;
+      })),
+      ...totals,totals.reduce((sum,value)=>sum+value,0)
+    ]);
+  }
+  const XLSX=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+  const totalStart=3+dates.length*cats.length;
+  const lastCol=totalStart+cats.length;
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:lastCol}},{s:{r:1,c:0},e:{r:1,c:lastCol}}];
+  for(let c=0;c<3;c++)ws['!merges'].push({s:{r:2,c},e:{r:3,c}});
+  dates.forEach((date,index)=>ws['!merges'].push({s:{r:2,c:3+index*cats.length},e:{r:2,c:3+(index+1)*cats.length-1}}));
+  ws['!merges'].push({s:{r:2,c:totalStart},e:{r:2,c:lastCol}});
+  ws['!cols']=[{wch:26},{wch:12},{wch:18},...Array(dates.length*cats.length).fill({wch:18}),...Array(cats.length+1).fill({wch:19})];
+  ws['!autofilter']={ref:'A4:'+XLSX.utils.encode_col(lastCol)+(rows.length)};
+  XLSX.utils.book_append_sheet(wb,ws,'Marks Report');
+  const safe=cls==='ALL'?'All-Classes':cls;
+  const filename=safe+'-'+(reportPeriod==='week'?'Week-'+reportWeek:'Day-'+reportDay)+'-Marks.xlsx';
+  try{XLSX.writeFileXLSX(wb,filename);notify('Excel report downloaded')}
+  catch(error){console.error(error);notify('Could not create Excel report: '+error.message)}
+}
+function exportPdf(){
+  let report;
+  try{report=selectedReport()}catch(error){notify(error.message);return}
+  const {cls,dates,list}=report;
+  if(!list.length){notify('No students found for this class.');return}
+  const cats=['Participation','Attendance','Homework','Quizzes','Behavior'];
+  const mark=(student,date,category)=>dailyMarks.find(m=>String(m.studentId)===String(student.id)&&m.date===date&&m.category===category);
+  const score=(student,date,category)=>Number((mark(student,date,category)||{}).score)||0;
+  const heads=dates.map(date=>'<th colspan="5">'+escapeHtml(date)+'</th>').join('');
+  const subheads=dates.map(()=>cats.map(category=>'<th>'+category+' / '+categoryMaxima[category]+'</th>').join('')).join('');
+  const totalHeads=cats.map(category=>'<th>'+category+' total</th>').join('')+'<th>Daily marks total</th>';
+  const rows=list.map(student=>{
+    const dayCells=dates.map(date=>cats.map(category=>{
+      const entry=mark(student,date,category);
+      if(!entry)return '<td>—</td>';
+      if(category==='Attendance')return '<td>'+escapeHtml((entry.status||((entry.score||0)===10?'Present':'Absent'))+' ('+(Number(entry.score)||0)+')')+'</td>';
+      return '<td>'+score(student,date,category)+'</td>';
+    }).join('')).join('');
+    const totals=cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
+    return '<tr><td>'+escapeHtml(student.name)+'</td><td>'+escapeHtml(student.cls)+'</td><td>'+((Number(student.grade)||0)+'/100')+'</td>'+dayCells+totals.map(value=>'<td>'+value+'</td>').join('')+'<td>'+totals.reduce((sum,value)=>sum+value,0)+'</td></tr>';
+  }).join('');
+  const title=(cls==='ALL'?'All Classes':cls)+' '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
+  const w=window.open('','_blank');
+  if(!w){notify('Allow pop-ups to print or save the report as PDF.');return}
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:12px Arial,sans-serif;padding:24px;color:#182033}h1{margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #cbd2df}th{background:#edf0f8}tr:nth-child(even){background:#fafbfe}.note{color:#5d6678}@page{size:landscape;margin:10mm}@media print{body{padding:0}table{font-size:8px}th,td{padding:4px;break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><h1>Khaled Math — '+escapeHtml(title)+'</h1><p class="note">'+(reportPeriod==='week'?'Week of '+escapeHtml(dates[0])+' to '+escapeHtml(dates[6]):'Selected day: '+escapeHtml(dates[0]))+' · '+list.length+' students · Category maxima apply per day</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Overall Grade</th>'+heads+'<th colspan="6">Selected period totals</th></tr><tr>'+subheads+totalHeads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\\/script></body></html>');
+  w.document.close();
+}
 function classWideToolbar(list){return '<div class="class-wide-toolbar"><div><b>Whole class</b><div class="muted small">'+list.length+' students in '+activeClass+'</div></div><div class="actions"><button class="grade-btn down" id="class-minus">−5 everyone</button><button class="grade-btn up" id="class-plus">+5 everyone</button><button class="grade-btn custom" id="class-custom">Custom</button></div><p class="muted small class-wide-note">Applies to every student in this class, not just selected students.</p></div>'}
 function applyClassAdjustment(amount){const targets=members(activeClass);if(!targets.length){notify('This class has no students yet');return}let changed=0;targets.forEach(s=>{const old=Number(s.grade)||0,next=Math.max(0,Math.min(100,old+amount));if(next===old)return;s.grade=next;history.unshift({id:crypto.randomUUID(),studentId:s.id,name:s.name,cls:s.cls,old,new:next,amount:next-old,time:new Date().toLocaleString(),note:'Whole-class adjustment'});changed++});persist();render();notify(changed+' students updated in '+activeClass)}
 function confirmClassAdjustment(amount){const targets=members(activeClass);if(!targets.length){notify('This class has no students yet');return}const affected=targets.filter(s=>Math.max(0,Math.min(100,(Number(s.grade)||0)+amount))!==(Number(s.grade)||0)).length;showModal('<div class="muted small">WHOLE-CLASS CONFIRMATION</div><h2>Apply '+(amount>0?'+':'')+amount+' points?</h2><p class="muted small">This will affect '+targets.length+' students in '+activeClass+'. '+affected+' grades will actually change. Grades remain between 0 and 100.</p><div class="modal-actions"><button class="icon-btn" id="cancel">Cancel</button><button class="primary" id="confirm-class">Confirm for class</button></div>');$('cancel').onclick=closeModal;$('confirm-class').onclick=()=>{closeModal();applyClassAdjustment(amount)}}
@@ -521,7 +622,7 @@ function classCustomAdjustment(){showModal('<div class="muted small">WHOLE-CLASS
 function bulkAdjust(amount){const targets=students.filter(s=>selectedStudents.has(String(s.id)));if(!targets.length){notify('Select students first');return}let changed=0;targets.forEach(s=>{const old=s.grade,next=Math.max(0,Math.min(100,old+amount));if(next===old)return;s.grade=next;history.unshift({id:crypto.randomUUID(),studentId:s.id,name:s.name,cls:s.cls,old,new:next,amount:next-old,time:new Date().toLocaleString(),note:'Bulk adjustment'});changed++});selectedStudents.clear();persist();render();notify(changed+' student grades updated')}
 function bulkCustom(){showModal('<div class="muted small">BULK CUSTOM ADJUSTMENT</div><h2>Adjust '+selectedStudents.size+' students</h2><div class="actions"><button class="grade-btn up" id="bulk-sign-plus">＋ Add</button><button class="grade-btn down" id="bulk-sign-minus">− Deduct</button></div><input id="bulk-amount" class="field" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter points" style="margin-top:14px"><div class="modal-actions"><button class="icon-btn" id="cancel">Cancel</button><button class="primary" id="apply-bulk">Apply to all</button></div>');let sign=1;$('bulk-sign-plus').onclick=()=>sign=1;$('bulk-sign-minus').onclick=()=>sign=-1;$('bulk-amount').addEventListener('input',e=>e.target.value=e.target.value.replace(/[^0-9]/g,''));$('cancel').onclick=closeModal;$('apply-bulk').onclick=()=>{const v=$('bulk-amount').value;if(!/^\d+$/.test(v)||Number(v)<1){notify('Enter a number greater than zero');return}closeModal();bulkAdjust(sign*Number(v))}}
 function searchBox(){return `<input id="search" class="field" placeholder="⌕  Search students by name..." value="${search.replace(/"/g,'&quot;')}"><div id="results">${table(page==='class'?members(activeClass):students)}</div>`}
-function bindActions(){document.querySelectorAll('[data-add-student]').forEach(b=>b.onclick=()=>studentModal(null,b.dataset.addStudent||activeClass));document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>studentModal(students.find(s=>s.id==b.dataset.edit),activeClass));document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>removeStudent(students.find(s=>s.id==b.dataset.delete)));document.querySelectorAll('[data-change]').forEach(b=>b.onclick=()=>change(students.find(s=>s.id==b.dataset.change),Number(b.dataset.amount)));document.querySelectorAll('[data-custom]').forEach(b=>b.onclick=()=>customGrade(students.find(s=>s.id==b.dataset.custom)));document.querySelectorAll('[data-select-student]').forEach(b=>b.onchange=()=>{const id=String(b.dataset.selectStudent);b.checked?selectedStudents.add(id):selectedStudents.delete(id);const c=$('selected-count');if(c)c.textContent=selectedStudents.size;document.querySelectorAll('#bulk-minus,#bulk-plus,#bulk-custom').forEach(x=>x.disabled=!selectedStudents.size)});if($('select-visible'))$('select-visible').onchange=e=>{const visible=page==='class'?members(activeClass):students;visible.filter(s=>s.name.toLowerCase().includes(search.toLowerCase())).forEach(s=>e.target.checked?selectedStudents.add(String(s.id)):selectedStudents.delete(String(s.id)));render()};if($('class-minus'))$('class-minus').onclick=()=>confirmClassAdjustment(-5);if($('class-plus'))$('class-plus').onclick=()=>confirmClassAdjustment(5);if($('class-custom'))$('class-custom').onclick=classCustomAdjustment;if($('bulk-minus'))$('bulk-minus').onclick=()=>bulkAdjust(-5);if($('bulk-plus'))$('bulk-plus').onclick=()=>bulkAdjust(5);if($('bulk-custom'))$('bulk-custom').onclick=bulkCustom;if($('export-excel'))$('export-excel').onclick=exportExcel;if($('export-pdf'))$('export-pdf').onclick=exportPdf;if($('mark-date'))$('mark-date').onchange=e=>{markDate=e.target.value;render()};if($('mark-student'))$('mark-student').onchange=e=>{markStudentId=e.target.value;render()};document.querySelectorAll('[data-mark-student][data-mark-category]').forEach(b=>b.onclick=()=>{markStudentId=b.dataset.markStudent;markCategory=b.dataset.markCategory;render();$('daily-mark-controls')?.scrollIntoView({behavior:'smooth',block:'center'})});document.querySelectorAll('[data-mark-adjust]').forEach(b=>b.onclick=()=>applyDailyMark(Number(b.dataset.markAdjust)));document.querySelectorAll('[data-mark-attendance]').forEach(b=>b.onclick=()=>applyAttendanceStatus(b.dataset.markAttendance));if($('mark-custom'))$('mark-custom').onclick=customDailyMark;document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{selectedId=Number(b.dataset.profile);go('profile')});document.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{activeClass=b.dataset.class;go('class')});document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));}
+function bindActions(){document.querySelectorAll('[data-add-student]').forEach(b=>b.onclick=()=>studentModal(null,b.dataset.addStudent||activeClass));document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>studentModal(students.find(s=>s.id==b.dataset.edit),activeClass));document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>removeStudent(students.find(s=>s.id==b.dataset.delete)));document.querySelectorAll('[data-change]').forEach(b=>b.onclick=()=>change(students.find(s=>s.id==b.dataset.change),Number(b.dataset.amount)));document.querySelectorAll('[data-custom]').forEach(b=>b.onclick=()=>customGrade(students.find(s=>s.id==b.dataset.custom)));document.querySelectorAll('[data-select-student]').forEach(b=>b.onchange=()=>{const id=String(b.dataset.selectStudent);b.checked?selectedStudents.add(id):selectedStudents.delete(id);const c=$('selected-count');if(c)c.textContent=selectedStudents.size;document.querySelectorAll('#bulk-minus,#bulk-plus,#bulk-custom').forEach(x=>x.disabled=!selectedStudents.size)});if($('select-visible'))$('select-visible').onchange=e=>{const visible=page==='class'?members(activeClass):students;visible.filter(s=>s.name.toLowerCase().includes(search.toLowerCase())).forEach(s=>e.target.checked?selectedStudents.add(String(s.id)):selectedStudents.delete(String(s.id)));render()};if($('class-minus'))$('class-minus').onclick=()=>confirmClassAdjustment(-5);if($('class-plus'))$('class-plus').onclick=()=>confirmClassAdjustment(5);if($('class-custom'))$('class-custom').onclick=classCustomAdjustment;if($('bulk-minus'))$('bulk-minus').onclick=()=>bulkAdjust(-5);if($('bulk-plus'))$('bulk-plus').onclick=()=>bulkAdjust(5);if($('bulk-custom'))$('bulk-custom').onclick=bulkCustom;if($('export-excel'))$('export-excel').onclick=exportExcel;if($('export-pdf'))$('export-pdf').onclick=exportPdf;if($('report-class'))$('report-class').onchange=e=>{reportClass=e.target.value};if($('report-period'))$('report-period').onchange=e=>{reportPeriod=e.target.value;$('report-day-wrap').classList.toggle('hidden',reportPeriod!=='day');$('report-week-wrap').classList.toggle('hidden',reportPeriod!=='week')};if($('report-day'))$('report-day').onchange=e=>{reportDay=e.target.value};if($('report-week'))$('report-week').onchange=e=>{reportWeek=e.target.value};if($('mark-date'))$('mark-date').onchange=e=>{markDate=e.target.value;render()};if($('mark-student'))$('mark-student').onchange=e=>{markStudentId=e.target.value;render()};document.querySelectorAll('[data-mark-student][data-mark-category]').forEach(b=>b.onclick=()=>{markStudentId=b.dataset.markStudent;markCategory=b.dataset.markCategory;render();$('daily-mark-controls')?.scrollIntoView({behavior:'smooth',block:'center'})});document.querySelectorAll('[data-mark-adjust]').forEach(b=>b.onclick=()=>applyDailyMark(Number(b.dataset.markAdjust)));document.querySelectorAll('[data-mark-attendance]').forEach(b=>b.onclick=()=>applyAttendanceStatus(b.dataset.markAttendance));if($('mark-custom'))$('mark-custom').onclick=customDailyMark;document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{selectedId=Number(b.dataset.profile);go('profile')});document.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{activeClass=b.dataset.class;go('class')});document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));}
 function profile(s){let hs=history.filter(h=>h.studentId===s.id);return `<button class="plain" data-page="students">← Back to students</button><div class="panel" style="margin-top:15px"><span class="pill">${s.cls} · ${classes.find(c=>c[0]===s.cls)[1]}</span><h2 style="font-size:23px;margin:14px 0 0">${escapeHtml(s.name)}</h2><div class="profile-grade">${s.grade}<span class="muted" style="font-size:14px"> / 100</span></div><div class="actions"><button class="grade-btn down" data-change="${s.id}" data-amount="-5">−5</button><button class="grade-btn custom" data-custom="${s.id}">Custom adjustment</button><button class="grade-btn up" data-change="${s.id}" data-amount="5">+5</button></div></div><div class="panel" style="margin-top:15px"><b>Grade history</b>${hs.length?hs.map(h=>`<div class="history-row"><span class="muted">${escapeHtml(h.time)}</span><b>${h.old} → ${h.new} <span class="${h.amount>=0?'positive':'negative'}">(${h.amount>0?'+':''}${h.amount})</span></b></div>`).join(''):'<div class="empty">No changes recorded yet.</div>'}</div>`}
 async function saveFeature(col,id,data){
   try{await setDoc(doc(db,col,String(id)),data);notify('Saved');return true}
