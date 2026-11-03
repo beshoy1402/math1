@@ -537,6 +537,7 @@ function selectedReport(){
   return {cls,dates,list};
 }
 function exportToolbar(){
+  if(page==='class'&&reportClass!=='ALL')reportClass=activeClass;
   const classesOptions='<option value="ALL" '+(reportClass==='ALL'?'selected':'')+'>All classes</option>'+classes.map(c=>'<option value="'+c[0]+'" '+(reportClass===c[0]?'selected':'')+'>'+c[0]+' · '+c[1]+'</option>').join('');
   return '<div class="export-toolbar report-toolbar"><label>Class<select class="field" id="report-class" style="width:auto;min-width:150px;margin:0">'+classesOptions+'</select></label><label>Report<select class="field" id="report-period" style="width:auto;margin:0"><option value="day" '+(reportPeriod==='day'?'selected':'')+'>One day</option><option value="week" '+(reportPeriod==='week'?'selected':'')+'>Whole week</option></select></label><label id="report-day-wrap" '+(reportPeriod==='week'?'class="hidden"':'')+'>Day<input class="field" type="date" id="report-day" value="'+escapeHtml(reportDay)+'" style="width:auto;margin:0"></label><label id="report-week-wrap" '+(reportPeriod==='day'?'class="hidden"':'')+'>Week<input class="field" type="week" id="report-week" value="'+escapeHtml(reportWeek)+'" style="width:auto;margin:0"></label><button class="icon-btn" id="export-excel">↓ Excel (.xlsx)</button><button class="icon-btn" id="export-pdf">↓ PDF / Print</button></div>';
 }
