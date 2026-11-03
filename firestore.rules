@@ -6,7 +6,7 @@ service cloud.firestore {
         && request.auth.uid == "QvrkmJMkEAc30zx4Be62OeJabYi1";
     }
     function isValidDailyMark(data) {
-      return data.keys().hasOnly(['id', 'studentId', 'studentName', 'cls', 'date', 'category', 'score'])
+      return data.keys().hasOnly(['id', 'studentId', 'studentName', 'cls', 'date', 'category', 'score', 'status'])
         && data.keys().hasAll(['id', 'studentId', 'studentName', 'cls', 'date', 'category', 'score'])
         && data.id is string && data.id.size() <= 180
         && data.studentId is number
@@ -18,7 +18,11 @@ service cloud.firestore {
         && ((data.category == 'Participation' && data.score <= 15)
           || (data.category == 'Attendance' && data.score <= 10)
           || (data.category == 'Homework' && data.score <= 10)
-          || (data.category == 'Behavior' && data.score <= 5));
+          || (data.category == 'Behavior' && data.score <= 5))
+        && ((data.category == 'Attendance' && 'status' in data
+              && ((data.status == 'Present' && data.score == 10)
+                || (data.status == 'Absent' && data.score == 0)))
+          || (data.category != 'Attendance' && !('status' in data)));
     }
     match /students/{id} { allow read, write: if isTeacher(); }
     match /gradeHistory/{id} { allow read, write: if isTeacher(); }
