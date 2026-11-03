@@ -335,7 +335,7 @@ const categoryMaxima={Participation:15,Attendance:10,Homework:10,Quizzes:15,Beha
 let selectedStudents=new Set();
 let attendanceRecords=[],homeworkItems=[],examItems=[],studentGroups=[],dailyMarks=[];
 let history=[],page='dashboard',activeClass='G12A',selectedId=null,undo=null,search='',toastTimer,markCategory='Participation',markDate=new Date().toISOString().slice(0,10),markStudentId=null;
-let reportPeriod='day',reportDay=localDateString(),reportWeek=isoWeekValue(),reportClass='G12A';
+let reportPeriod='day',reportDay=localDateString(),reportWeek=schoolWeekStartValue(),reportClass='G12A';
 const $=id=>document.getElementById(id), average=a=>a.length?(a.reduce((n,s)=>n+s.grade,0)/a.length).toFixed(1):'—', members=c=>students.filter(s=>s.cls===c);
 function nextStudentId(){
   const used=new Set([
@@ -512,22 +512,21 @@ async function applyDailyMark(amount){
 function localDateString(date=new Date()){
   return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
 }
-function isoWeekValue(date=new Date()){
-  const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
-  d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
-  const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
-  const week=Math.ceil((((d-yearStart)/86400000)+1)/7);
-  return d.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+function schoolWeekStartValue(date=new Date()){
+  const sunday=new Date(date.getFullYear(),date.getMonth(),date.getDate()-date.getDay());
+  return localDateString(sunday);
 }
 function reportDates(){
   if(reportPeriod==='week'){
-    const match=/^(\\d{4})-W(\\d{2})$/.exec(reportWeek);
-    if(!match)throw new Error('Choose a valid week.');
-    const year=Number(match[1]),week=Number(match[2]),jan4=new Date(Date.UTC(year,0,4));
-    const monday=new Date(jan4);monday.setUTCDate(jan4.getUTCDate()-(jan4.getUTCDay()||7)+1+(week-1)*7);
-    return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setUTCDate(monday.getUTCDate()+i);return d.toISOString().slice(0,10)});
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(reportWeek))throw new Error('Choose a valid week starting Sunday.');
+    const parts=reportWeek.split('-').map(Number),selected=new Date(parts[0],parts[1]-1,parts[2]);
+    if(selected.getFullYear()!==parts[0]||selected.getMonth()!==parts[1]-1||selected.getDate()!==parts[2])throw new Error('Choose a valid week starting Sunday.');
+    const sunday=new Date(selected.getFullYear(),selected.getMonth(),selected.getDate()-selected.getDay());
+    return Array.from({length:5},(_,i)=>localDateString(new Date(sunday.getFullYear(),sunday.getMonth(),sunday.getDate()+i)));
   }
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(reportDay))throw new Error('Choose a valid day.');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(reportDay))throw new Error('Choose a valid day.');
+  const parts=reportDay.split('-').map(Number),selected=new Date(parts[0],parts[1]-1,parts[2]);
+  if(selected.getFullYear()!==parts[0]||selected.getMonth()!==parts[1]-1||selected.getDate()!==parts[2])throw new Error('Choose a valid day.');
   return [reportDay];
 }
 function selectedReport(){
@@ -539,7 +538,7 @@ function selectedReport(){
 function exportToolbar(){
   if(page==='class'&&reportClass!=='ALL')reportClass=activeClass;
   const classesOptions='<option value="ALL" '+(reportClass==='ALL'?'selected':'')+'>All classes</option>'+classes.map(c=>'<option value="'+c[0]+'" '+(reportClass===c[0]?'selected':'')+'>'+c[0]+' · '+c[1]+'</option>').join('');
-  return '<div class="export-toolbar report-toolbar"><label>Class<select class="field" id="report-class" style="width:auto;min-width:150px;margin:0">'+classesOptions+'</select></label><label>Report<select class="field" id="report-period" style="width:auto;margin:0"><option value="day" '+(reportPeriod==='day'?'selected':'')+'>One day</option><option value="week" '+(reportPeriod==='week'?'selected':'')+'>Whole week</option></select></label><label id="report-day-wrap" '+(reportPeriod==='week'?'class="hidden"':'')+'>Day<input class="field" type="date" id="report-day" value="'+escapeHtml(reportDay)+'" style="width:auto;margin:0"></label><label id="report-week-wrap" '+(reportPeriod==='day'?'class="hidden"':'')+'>Week<input class="field" type="week" id="report-week" value="'+escapeHtml(reportWeek)+'" style="width:auto;margin:0"></label><button class="icon-btn" id="export-excel">↓ Excel (.xlsx)</button><button class="icon-btn" id="export-pdf">↓ PDF / Print</button></div>';
+  return '<div class="export-toolbar report-toolbar"><label>Class<select class="field" id="report-class" style="width:auto;min-width:150px;margin:0">'+classesOptions+'</select></label><label>Report<select class="field" id="report-period" style="width:auto;margin:0"><option value="day" '+(reportPeriod==='day'?'selected':'')+'>One day</option><option value="week" '+(reportPeriod==='week'?'selected':'')+'>Whole week</option></select></label><label id="report-day-wrap" '+(reportPeriod==='week'?'class="hidden"':'')+'>Day<input class="field" type="date" id="report-day" value="'+escapeHtml(reportDay)+'" style="width:auto;margin:0"></label><label id="report-week-wrap" '+(reportPeriod==='day'?'class="hidden"':'')+'>Week starting Sunday<input class="field" type="date" id="report-week" value="'+escapeHtml(reportWeek)+'" style="width:auto;margin:0"></label><button class="icon-btn" id="export-excel">↓ Excel (.xlsx)</button><button class="icon-btn" id="export-pdf">↓ PDF / Print</button></div>';
 }
 
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -556,7 +555,7 @@ async function exportExcel(){
   const score=(student,date,category)=>Number((mark(student,date,category)||{}).score)||0;
   const categoryTotals=student=>cats.map(category=>dates.reduce((sum,date)=>sum+score(student,date,category),0));
   const title=(cls==='ALL'?'All Classes':cls)+' · '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
-  const rows=[[title],[(reportPeriod==='week'?'Week of ':'Day: ')+dates[0]+' to '+dates[dates.length-1]+' · '+list.length+' students · Maxima apply per day']];
+  const rows=[[title],[(reportPeriod==='week'?'Sunday–Thursday: ':'Day: ')+dates[0]+' to '+dates[dates.length-1]+' · '+list.length+' students · Maxima apply per day']];
   rows.push(['Student','Class','Overall Grade / 100',...dates.flatMap(date=>[date,'','','','']),'Selected period totals']);
   rows.push(['','','',...dates.flatMap(()=>cats.map(category=>category+' / '+categoryMaxima[category])),'Participation total','Attendance total','Homework total','Quizzes total','Behavior total','Daily marks total']);
   for(const student of list){
@@ -611,7 +610,7 @@ function exportPdf(){
   const title=(cls==='ALL'?'All Classes':cls)+' '+(reportPeriod==='week'?'Weekly':'Daily')+' Marks Report';
   const w=window.open('','_blank');
   if(!w){notify('Allow pop-ups to print or save the report as PDF.');return}
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:12px Arial,sans-serif;padding:24px;color:#182033}h1{margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #cbd2df}th{background:#edf0f8}tr:nth-child(even){background:#fafbfe}.note{color:#5d6678}@page{size:landscape;margin:10mm}@media print{body{padding:0}table{font-size:8px}th,td{padding:4px;break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><h1>Khaled Math — '+escapeHtml(title)+'</h1><p class="note">'+(reportPeriod==='week'?'Week of '+escapeHtml(dates[0])+' to '+escapeHtml(dates[6]):'Selected day: '+escapeHtml(dates[0]))+' · '+list.length+' students · Category maxima apply per day</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Overall Grade</th>'+heads+'<th colspan="6">Selected period totals</th></tr><tr>'+subheads+totalHeads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\\/script></body></html>');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:12px Arial,sans-serif;padding:24px;color:#182033}h1{margin-bottom:6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{text-align:left;padding:7px;border:1px solid #cbd2df}th{background:#edf0f8}tr:nth-child(even){background:#fafbfe}.note{color:#5d6678}@page{size:landscape;margin:10mm}@media print{body{padding:0}table{font-size:8px}th,td{padding:4px;break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><h1>Khaled Math — '+escapeHtml(title)+'</h1><p class="note">'+(reportPeriod==='week'?'Sunday–Thursday: '+escapeHtml(dates[0])+' to '+escapeHtml(dates[4]):'Selected day: '+escapeHtml(dates[0]))+' · '+list.length+' students · Category maxima apply per day</p><table><thead><tr><th rowspan="2">Student</th><th rowspan="2">Class</th><th rowspan="2">Overall Grade</th>'+heads+'<th colspan="6">Selected period totals</th></tr><tr>'+subheads+totalHeads+'</tr></thead><tbody>'+rows+'</tbody></table><script>window.onload=()=>window.print()<\\/script></body></html>');
   w.document.close();
 }
 function classWideToolbar(list){return '<div class="class-wide-toolbar"><div><b>Whole class</b><div class="muted small">'+list.length+' students in '+activeClass+'</div></div><div class="actions"><button class="grade-btn down" id="class-minus">−5 everyone</button><button class="grade-btn up" id="class-plus">+5 everyone</button><button class="grade-btn custom" id="class-custom">Custom</button></div><p class="muted small class-wide-note">Applies to every student in this class, not just selected students.</p></div>'}
