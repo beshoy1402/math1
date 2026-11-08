@@ -311,6 +311,24 @@ main{flex:1;min-width:0;padding:30px clamp(18px,4vw,48px);max-width:1500px;margi
 <main><header class="topbar"><div class="topbar-heading"><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button><div><div class="crumb">Khaled Math / <span id="crumb">Dashboard</span></div><h1 id="page-title">Dashboard</h1></div></div><div class="top-actions"><button class="icon-btn" id="command-open" title="Command center">⌕</button><button class="icon-btn" id="theme" title="Toggle theme">◐</button><div class="profile-chip">MK &nbsp; Mr. Khaled</div><button class="icon-btn" id="logout">Sign out</button></div></header><div id="content"></div></main>
 </div>
 <div class="modal-back hidden" id="modal-back"><div class="modal" id="modal"></div></div><button id="quick-fab" class="quick-fab" aria-label="Quick actions">＋</button><div id="toast" class="toast hidden"></div>
+<script>
+(function () {
+  var submit = document.getElementById('login-submit');
+  if (!submit) return;
+  submit.addEventListener('click', function () {
+    window.setTimeout(function () {
+      if (!window.__teacherLoginReady) {
+        var error = document.getElementById('login-error');
+        if (error) error.textContent = 'The sign-in service could not start. Check that JavaScript modules are allowed and reload the page.';
+      }
+    }, 900);
+  });
+  window.addEventListener('error', function (event) {
+    var error = document.getElementById('login-error');
+    if (error && event.message) error.textContent = 'Website startup error: ' + event.message;
+  });
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
@@ -327,6 +345,53 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+
+// Attach authentication controls immediately so later dashboard startup errors cannot disable login.
+const loginErrorEl = document.getElementById('login-error');
+const loginButtonEl = document.getElementById('login-submit');
+const loginIdentityEl = document.getElementById('login-email');
+const loginPasswordEl = document.getElementById('login-password');
+document.getElementById('enter').addEventListener('click', () => {
+  document.getElementById('login-panel').classList.remove('hidden');
+  loginIdentityEl.focus();
+});
+loginButtonEl.addEventListener('click', async () => {
+  const identity = loginIdentityEl.value.trim();
+  const password = loginPasswordEl.value;
+  loginErrorEl.textContent = '';
+  if (!identity || !password) {
+    loginErrorEl.textContent = 'Enter your username/email and password.';
+    return;
+  }
+  const email = identity.includes('@') ? identity : identity.toLowerCase().replace(/[^a-z0-9._-]/g, '') + '@khaled-math-e2b24.firebaseapp.com';
+  loginButtonEl.disabled = true;
+  const originalLabel = loginButtonEl.textContent;
+  loginButtonEl.textContent = 'Signing in…';
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    loginErrorEl.textContent = error.code === 'auth/invalid-credential'
+      ? 'Incorrect username/email or password.'
+      : error.code === 'auth/network-request-failed'
+        ? 'Network error. Check your connection and try again.'
+        : error.message || 'Sign-in failed.';
+  } finally {
+    loginButtonEl.disabled = false;
+    loginButtonEl.textContent = originalLabel;
+  }
+});
+document.getElementById('google-login').addEventListener('click', async () => {
+  loginErrorEl.textContent = '';
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (error) {
+    loginErrorEl.textContent = error.code === 'auth/popup-closed-by-user' ? 'Sign-in window was closed.' : error.message;
+  }
+});
+loginPasswordEl.addEventListener('keydown', event => {
+  if (event.key === 'Enter') loginButtonEl.click();
+});
+window.__teacherLoginReady = true;
 let stopStudents = null, stopHistory = null, stopAttendance=null, stopHomework=null, stopExams=null, stopGroups=null, stopDailyMarks=null, syncing = false;
 
 const classes=[['G12A','AP Calculus','∫'],['G12B','Advanced Math','π'],['G12C','Advanced Math','∑'],['G12D','Advanced Math','√']];
@@ -699,10 +764,6 @@ if($('undo'))$('undo').onclick=undoLast;if($('class-reset'))$('class-reset').onc
 if($('att-class'))$('att-class').onchange=e=>{activeClass=e.target.value;render()};document.querySelectorAll('.att-select').forEach(x=>x.onchange=()=>{let d=new Date().toISOString().slice(0,10),id=x.dataset.id,r={id:id+'_'+d,studentId:id,cls:activeClass,date:d,status:x.value};let i=attendanceRecords.findIndex(y=>y.id===r.id);if(i>=0)attendanceRecords[i]=r;else attendanceRecords.push(r);saveFeature('attendance',r.id,r)});if($('hw-add'))$('hw-add').onclick=()=>{showModal('<h2>New homework</h2><input id="hw-title" class="field" placeholder="Assignment title"><input id="hw-due" class="field" type="date"><select id="hw-class" class="field">'+classes.map(c=>'<option>'+c[0]+'</option>').join('')+'</select><select id="hw-status" class="field"><option>Assigned</option><option>Completed</option><option>Missing</option><option>Late</option></select><div class="modal-actions"><button class="icon-btn" id="cancel">Cancel</button><button class="primary" id="save-hw">Save</button></div>');$('cancel').onclick=closeModal;$('save-hw').onclick=()=>{let x={id:crypto.randomUUID(),title:$('hw-title').value, due:$('hw-due').value,cls:$('hw-class').value,status:$('hw-status').value};if(!x.title.trim()){notify('Enter a title');return}homeworkItems.unshift(x);saveFeature('homework',x.id,x);closeModal();render()}};if($('exam-add'))$('exam-add').onclick=()=>{showModal('<h2>New exam</h2><input id="exam-title" class="field" placeholder="Exam title"><input id="exam-date" class="field" type="date"><select id="exam-class" class="field">'+classes.map(c=>'<option>'+c[0]+'</option>').join('')+'</select><input id="exam-max" class="field" inputmode="numeric" placeholder="Maximum score" value="100"><div class="modal-actions"><button class="icon-btn" id="cancel">Cancel</button><button class="primary" id="save-exam">Save exam</button></div>');$('cancel').onclick=closeModal;$('save-exam').onclick=()=>{let x={id:crypto.randomUUID(),title:$('exam-title').value,date:$('exam-date').value,cls:$('exam-class').value,max:Number($('exam-max').value)||100};if(!x.title.trim()){notify('Enter an exam title');return}examItems.unshift(x);saveFeature('exams',x.id,x);closeModal();render()}};if($('groups-create'))$('groups-create').onclick=()=>{let a=[...members(activeClass)].sort(()=>Math.random()-.5);if(!a.length){notify('No students');return}let size=Math.max(2,Number(prompt('Students per team?','4'))||4);for(let i=0;i<a.length;i+=size){let g={id:crypto.randomUUID(),name:'Team '+(Math.floor(i/size)+1),cls:activeClass,members:a.slice(i,i+size).map(s=>s.name)};studentGroups.push(g);saveFeature('groups',g.id,g)}render()};if($('open-delete-data'))$('open-delete-data').onclick=()=>{showModal('<div class="muted small">PERMANENT ACTION</div><h2>Delete all data?</h2><p class="muted small">Enter the current teacher account password, then type DELETE to confirm.</p><label class="small">Account password</label><input id="delete-password" class="field" type="password" autocomplete="current-password" placeholder="Current account password"><label class="small">Type DELETE to confirm</label><input id="delete-confirm-text" class="field" autocomplete="off" placeholder="DELETE"><p id="delete-error" class="small" style="color:var(--danger,#d44)"></p><div class="modal-actions"><button class="icon-btn" id="cancel">Cancel</button><button class="danger" id="confirm-delete-all">Permanently delete</button></div>');$('cancel').onclick=closeModal;$('confirm-delete-all').onclick=async()=>{const user=auth.currentUser,password=$('delete-password').value,confirmation=$('delete-confirm-text').value;if(!user||!user.email){$('delete-error').textContent='A password-based teacher account is required for this action.';return}if(!password||confirmation!=='DELETE'){$('delete-error').textContent='Enter your password and type DELETE exactly.';return}const btn=$('confirm-delete-all');btn.disabled=true;btn.textContent='Verifying…';try{await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));const names=['students','gradeHistory','attendance','homework','exams','groups','dailyMarks'];for(const name of names){const snap=await getDocs(collection(db,name));const docs=snap.docs;for(let i=0;i<docs.length;i+=450){const batch=writeBatch(db);docs.slice(i,i+450).forEach(d=>batch.delete(d.ref));await batch.commit()}}students=[];history=[];attendanceRecords=[];homeworkItems=[];examItems=[];studentGroups=[];dailyMarks=[];selectedStudents.clear();undo=null;closeModal();page='dashboard';render();notify('All teacher data has been deleted.')}catch(error){$('delete-error').textContent=error.code==='auth/invalid-credential'?'Incorrect account password.':error.message;btn.disabled=false;btn.textContent='Permanently delete'}}};if($('calculate'))$('calculate').onclick=()=>{let scores=[...document.querySelectorAll('.score')].map(x=>Number(x.value)),weights=[...document.querySelectorAll('.weight')].map(x=>Number(x.value)),total=weights.reduce((a,b)=>a+b,0);$('calc-result').textContent=total===100?scores.reduce((a,b,i)=>a+b*weights[i]/100,0).toFixed(2)+'%':'Weights must total 100%';};
 }
 function go(p){page=p;document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===p||(p==='class'&&b.dataset.page==='classes')||(p==='profile'&&b.dataset.page==='students')));render();window.scrollTo({top:0,behavior:'smooth'})}
-$('enter').onclick=()=>{$('login-panel').classList.remove('hidden');$('login-email').focus()};
-$('login-submit').onclick=async()=>{let identity=$('login-email').value.trim(),password=$('login-password').value;$('login-error').textContent='';if(!identity||!password){$('login-error').textContent='Enter your username/email and password.';return}const email=identity.includes('@')?identity:identity.toLowerCase().replace(/[^a-z0-9._-]/g,'')+'@khaled-math-e2b24.firebaseapp.com';try{await signInWithEmailAndPassword(auth,email,password)}catch(error){$('login-error').textContent=error.code==='auth/invalid-credential'?'Incorrect username/email or password.':error.message}};
-$('google-login').onclick=async()=>{ $('login-error').textContent='';try{const provider=new GoogleAuthProvider();await signInWithPopup(auth,provider)}catch(error){$('login-error').textContent=error.code==='auth/popup-closed-by-user'?'Sign-in window was closed.':error.message}};
-$('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')$('login-submit').click()});
 $('logout').onclick=()=>signOut(auth);
 const TEACHER_UID='QvrkmJMkEAc30zx4Be62OeJabYi1';
 onAuthStateChanged(auth,user=>{
