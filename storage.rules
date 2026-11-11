@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isTeacher(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && request.auth.uid == "QvrkmJMkEAc30zx4Be62OeJabYi1";
+    }
+
+    match /teacherMaterials/{uid}/{materialId}/{fileName} {
+      allow read: if isTeacher(uid);
+      allow create, update: if isTeacher(uid)
+        && request.resource.size <= 100 * 1024 * 1024
+        && request.resource.contentType.matches(
+          'application/pdf|video/(mp4|quicktime|webm)|application/(msword|vnd.ms-(powerpoint|excel)|vnd.openxmlformats-officedocument.(wordprocessingml.document|presentationml.presentation|spreadsheetml.sheet))|image/(png|jpeg)'
+        );
+      allow delete: if isTeacher(uid);
+    }
+  }
+}
