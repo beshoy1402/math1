@@ -32,6 +32,7 @@ service cloud.firestore {
     match /homework/{id} { allow read, write: if isTeacher(); }
     match /exams/{id} { allow read, write: if isTeacher(); }
     match /groups/{id} { allow read, write: if isTeacher(); }
+    match /materials/{id} { allow read, write: if isTeacher(); }
     match /dailyMarks/{id} {
       allow read, delete: if isTeacher();
       allow create, update: if isTeacher()
